@@ -1,0 +1,15 @@
+[gd_scene load_steps=2 format=3 uid="uid://bjfpiqesnrwqu"]
+
+[ext_resource type="Script" uid="uid://cah3pm37nk5km" path="res://core/controllers/game_view_controller.gd" id="1_hb84f"]
+
+[node name="GameView" type="Node2D"]
+script = ExtResource("1_hb84f")
+
+[node name="GravityTimer" type="Timer" parent="."]
+unique_name_in_owner = true
+
+[node name="DemoTimer" type="Timer" parent="."]
+unique_name_in_owner = true
+
+[node name="BlockContainer" type="Node2D" parent="."]
+unique_name_in_owner = true

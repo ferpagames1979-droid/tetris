@@ -14,6 +14,10 @@ config/name="Tetris1984"
 config/features=PackedStringArray("4.5", "GL Compatibility")
 config/icon="res://icon.svg"
 
+[autoload]
+
+PrintLogManager="*res://core/managers/PrintLogManager.gd"
+
 [rendering]
 
 renderer/rendering_method="gl_compatibility"
