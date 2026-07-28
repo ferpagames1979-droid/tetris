@@ -30,6 +30,7 @@ func _ready() -> void:
 		"GameView iniciando...")
 
 	_setup_cell_size_from_texture()
+	_setup_board_panel_size()
 
 	board_model = BoardModel.new()
 	board_model.setup_empty_grid()
@@ -224,3 +225,14 @@ func _input(event: InputEvent) -> void:
 			move_left()
 		KEY_RIGHT, KEY_D:
 			move_right()
+
+func _setup_board_panel_size() -> void:
+	var board_width: float = BoardModel.GRID_COLUMNS * cell_size
+	var board_height: float = BoardModel.GRID_ROWS * cell_size
+
+	board_panel.custom_minimum_size = Vector2(board_width, board_height)
+
+	PrintLogManager.printlog(CLASS_NAME_LOG,
+		PrintLogManager.LogType.INFO,
+		"BoardPanel dimensionado: %.0fx%.0f (cols=%d rows=%d cell_size=%d)" %
+		[board_width, board_height, BoardModel.GRID_COLUMNS, BoardModel.GRID_ROWS, cell_size])
