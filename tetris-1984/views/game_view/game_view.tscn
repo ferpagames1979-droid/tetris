@@ -1,8 +1,25 @@
-[gd_scene load_steps=2 format=3 uid="uid://bjfpiqesnrwqu"]
+[gd_scene load_steps=4 format=3 uid="uid://bjfpiqesnrwqu"]
 
 [ext_resource type="Script" uid="uid://cah3pm37nk5km" path="res://core/controllers/game_view_controller.gd" id="1_hb84f"]
+[ext_resource type="StyleBox" uid="uid://c7jnfjrxf18d1" path="res://meus_estilos/game_view-STYLES_BORDERS_LEFT_RIGHT.tres" id="2_vbs4l"]
 
-[node name="GameView" type="Node2D"]
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_hb84f"]
+bg_color = Color(0, 0, 0, 1)
+border_width_left = 10
+border_width_right = 10
+border_color = Color(0, 0, 0.8, 1)
+border_blend = true
+shadow_color = Color(0, 0, 1, 0.5882353)
+shadow_size = 50
+shadow_offset = Vector2(10, 0)
+
+[node name="GameView" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
 script = ExtResource("1_hb84f")
 
 [node name="GravityTimer" type="Timer" parent="."]
@@ -11,5 +28,30 @@ unique_name_in_owner = true
 [node name="DemoTimer" type="Timer" parent="."]
 unique_name_in_owner = true
 
-[node name="BlockContainer" type="Node2D" parent="."]
+[node name="MainHbox" type="HBoxContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="LeftPanel" type="Panel" parent="MainHbox"]
+custom_minimum_size = Vector2(300, 0)
+layout_mode = 2
+theme_override_styles/panel = ExtResource("2_vbs4l")
+
+[node name="BoardPanel" type="Panel" parent="MainHbox"]
 unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_styles/panel = SubResource("StyleBoxFlat_hb84f")
+
+[node name="BlockContainer" type="Node2D" parent="MainHbox/BoardPanel"]
+unique_name_in_owner = true
+position = Vector2(203, 0)
+
+[node name="RightPanel" type="Panel" parent="MainHbox"]
+custom_minimum_size = Vector2(300, 0)
+layout_mode = 2
+theme_override_styles/panel = ExtResource("2_vbs4l")

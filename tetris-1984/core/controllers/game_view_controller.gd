@@ -1,14 +1,14 @@
 ## 📌 game_view_controller.gd
-## Controller da tela de jogo — spawn, gravidade e demo de rotação (Ep1)
+## Controller da tela de jogo — spawn, gravidade, demo de rotação e movimento manual (Ep2)
 ## cell_size é derivado da textura em runtime (16/24/32/64px, o asset comanda)
 class_name GameViewController
-extends Node2D
+extends Control
 
 const CLASS_NAME_LOG: String = "GameViewController"
 
 const BLOCK_TEXTURE: Texture2D = preload("res://assets/textures/block_base.png")
 
-const GRAVITY_INTERVAL: float = 0.8    ## segundos entre cada queda de 1 linha
+const GRAVITY_INTERVAL: float = 0.8     ## segundos entre cada queda de 1 linha
 const DEMO_ACTION_INTERVAL: float = 1.2 ## segundos entre cada rotação automática
 
 var cell_size: int = 32  ## valor default, sobrescrito em _ready() pelo tamanho real da textura
@@ -20,7 +20,8 @@ var locked_block_visuals: Dictionary = {}           ## blocos fixados na pilha (
 
 @onready var gravity_timer: Timer = $GravityTimer
 @onready var demo_timer: Timer = $DemoTimer
-@onready var block_container: Node2D = $BlockContainer
+@onready var block_container: Node2D = %BlockContainer
+@onready var board_panel: Panel = %BoardPanel
 
 ## 📌 Inicializa cell_size a partir da textura, o board, timers e a primeira peça
 func _ready() -> void:
@@ -32,6 +33,8 @@ func _ready() -> void:
 
 	board_model = BoardModel.new()
 	board_model.setup_empty_grid()
+
+	board_panel.resized.connect(_center_board_container)
 
 	gravity_timer.wait_time = GRAVITY_INTERVAL
 	gravity_timer.timeout.connect(_on_gravity_tick)
@@ -45,6 +48,7 @@ func _ready() -> void:
 		PrintLogManager.LogType.INFO,
 		"Timers configurados: gravidade=%.2fs | demo=%.2fs" % [GRAVITY_INTERVAL, DEMO_ACTION_INTERVAL])
 
+	call_deferred("_center_board_container")
 	_spawn_new_piece()
 
 ## 📌 Lê o tamanho real da textura e define cell_size — a textura comanda o grid
@@ -68,6 +72,20 @@ func _setup_cell_size_from_texture() -> void:
 	PrintLogManager.printlog(CLASS_NAME_LOG,
 		PrintLogManager.LogType.INFO,
 		"cell_size definido pela textura: %dpx" % cell_size)
+
+## 📌 Centraliza o BlockContainer dentro do BoardPanel com base no tamanho real do grid
+func _center_board_container() -> void:
+	var grid_width: float = BoardModel.GRID_COLUMNS * cell_size
+	var grid_height: float = BoardModel.GRID_ROWS * cell_size
+
+	var offset_x: float = (board_panel.size.x - grid_width) / 2.0
+	var offset_y: float = (board_panel.size.y - grid_height) / 2.0
+
+	block_container.position = Vector2(offset_x, offset_y)
+
+	PrintLogManager.printlog(CLASS_NAME_LOG,
+		PrintLogManager.LogType.DEBUG,
+		"BlockContainer centralizado: offset=%s | board_panel.size=%s" % [str(block_container.position), str(board_panel.size)])
 
 ## 📌 Cria uma nova peça sempre no centro do grid, no topo
 func _spawn_new_piece() -> void:
@@ -99,7 +117,7 @@ func _on_gravity_tick() -> void:
 	else:
 		_lock_piece_and_spawn_next()
 
-## 📌 Demo automática: rotaciona a peça enquanto ela cai (Ep1, sem teclado)
+## 📌 Demo automática: rotaciona a peça enquanto ela cai (rotação manual chega no Ep3)
 func _on_demo_tick() -> void:
 	rotate_piece()
 
@@ -115,6 +133,8 @@ func rotate_piece() -> void:
 		current_piece.revert_rotation(original_state)
 
 	_redraw_active_piece()
+
+
 
 ## 📌 Retorna as células da peça caso ela se mova pelo offset informado
 func _cells_moved(offset: Vector2i) -> Array[Vector2i]:
@@ -165,7 +185,7 @@ func _create_block_visual(cell: Vector2i, piece_type: int) -> TextureRect:
 	block.position = Vector2(cell.y * cell_size, cell.x * cell_size)
 	return block
 
-## 📌 Trata o game over: para os timers e loga o evento (Ep1: sem tela de game over ainda)
+## 📌 Trata o game over: para os timers e loga o evento (ainda sem tela de game over)
 func _handle_game_over() -> void:
 	PrintLogManager.printlog(CLASS_NAME_LOG,
 		PrintLogManager.LogType.ERROR,
@@ -174,3 +194,33 @@ func _handle_game_over() -> void:
 
 	gravity_timer.stop()
 	demo_timer.stop()
+	
+func move_left() -> void:
+	var next_cells: Array[Vector2i] = _cells_moved(Vector2i(0, -1))
+	if board_model.can_place(next_cells):
+		current_piece.grid_position.y -= 1
+		_redraw_active_piece()
+	else:
+		PrintLogManager.printlog(CLASS_NAME_LOG,
+		PrintLogManager.LogType.ERROR,
+		"move_left bloqued!")
+		
+	
+func move_right() -> void:
+	var next_cells: Array[Vector2i] = _cells_moved(Vector2i(0, 1))
+	if board_model.can_place(next_cells):
+		current_piece.grid_position.y += 1
+		_redraw_active_piece()
+	else:
+		PrintLogManager.printlog(CLASS_NAME_LOG,
+		PrintLogManager.LogType.ERROR,
+		"move_right bloqued!")
+	
+func _input(event: InputEvent) -> void:
+	if not event is InputEventKey or not event.pressed:
+		return
+	match event.keycode:
+		KEY_LEFT, KEY_A:
+			move_left()
+		KEY_RIGHT, KEY_D:
+			move_right()
