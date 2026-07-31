@@ -17,6 +17,7 @@ config/icon="res://icon.svg"
 [autoload]
 
 PrintLogManager="*res://core/managers/PrintLogManager.gd"
+SignalBus="*res://core/managers/signal_bus.gd"
 
 [rendering]
 
