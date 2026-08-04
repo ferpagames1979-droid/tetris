@@ -1,5 +1,5 @@
 ## 📌 game_view_controller.gd
-## Controller da tela de jogo
+## Controller da tela de jogo — spawn, gravidade, rotação, soft drop e line clear (Ep4)
 ## cell_size é derivado da textura em runtime (16/24/32/64px, o asset comanda)
 class_name GameViewController
 extends Control
@@ -8,16 +8,16 @@ const CLASS_NAME_LOG: String = "GameViewController"
 
 const BLOCK_TEXTURE: Texture2D = preload("res://assets/textures/block_base.png")
 
-const GRAVITY_INTERVAL: float = 0.8      ## segundos entre cada queda de 1 linha (velocidade normal)
-const SOFT_DROP_INTERVAL: float = 0.05   ## segundos entre cada queda durante soft drop (acelerado)
+const GRAVITY_INTERVAL: float = 0.8
+const SOFT_DROP_INTERVAL: float = 0.05
 
-var cell_size: int = 32  ## valor default, sobrescrito em _ready() pelo tamanho real da textura
+var cell_size: int = 32
 
 var board_model: BoardModel
 var current_piece: PieceModel
-var active_block_visuals: Array[TextureRect] = []   ## só a peça ativa (redesenha a cada tick)
-var locked_block_visuals: Dictionary = {}           ## blocos fixados na pilha (permanentes)
-var is_soft_dropping: bool = false                  ## estado atual do soft drop
+var active_block_visuals: Array[TextureRect] = []
+var locked_block_visuals: Array[TextureRect] = []
+var is_soft_dropping: bool = false
 
 @onready var gravity_timer: Timer = $GravityTimer
 @onready var block_container: Node2D = %BlockContainer
@@ -40,10 +40,6 @@ func _ready() -> void:
 	gravity_timer.wait_time = GRAVITY_INTERVAL
 	gravity_timer.timeout.connect(_on_gravity_tick)
 	gravity_timer.start()
-
-	PrintLogManager.printlog(CLASS_NAME_LOG,
-		PrintLogManager.LogType.INFO,
-		"Timer de gravidade configurado: %.2fs" % GRAVITY_INTERVAL)
 
 	call_deferred("_center_board_container")
 	_spawn_new_piece()
@@ -79,8 +75,7 @@ func _setup_board_panel_size() -> void:
 
 	PrintLogManager.printlog(CLASS_NAME_LOG,
 		PrintLogManager.LogType.INFO,
-		"BoardPanel dimensionado: %.0fx%.0f (cols=%d rows=%d cell_size=%d)" %
-		[board_width, board_height, BoardModel.GRID_COLUMNS, BoardModel.GRID_ROWS, cell_size])
+		"BoardPanel dimensionado: %.0fx%.0f" % [board_width, board_height])
 
 ## 📌 Centraliza o BlockContainer dentro do BoardPanel com base no tamanho real do grid
 func _center_board_container() -> void:
@@ -91,10 +86,6 @@ func _center_board_container() -> void:
 	var offset_y: float = (board_panel.size.y - grid_height) / 2.0
 
 	block_container.position = Vector2(offset_x, offset_y)
-
-	PrintLogManager.printlog(CLASS_NAME_LOG,
-		PrintLogManager.LogType.DEBUG,
-		"BlockContainer centralizado: offset=%s | board_panel.size=%s" % [str(block_container.position), str(board_panel.size)])
 
 ## 📌 Cria uma nova peça sempre no centro do grid, no topo
 func _spawn_new_piece() -> void:
@@ -112,6 +103,7 @@ func _spawn_new_piece() -> void:
 		PrintLogManager.printlog(CLASS_NAME_LOG,
 			PrintLogManager.LogType.ERROR,
 			"GAME OVER: nova peça não coube na posição de spawn (Block Out)")
+		SignalBus.GameViewControllerSignal_game_over.emit(board_model.total_lines_cleared, board_model.current_level)
 		_handle_game_over()
 		return
 
@@ -127,15 +119,12 @@ func _on_gravity_tick() -> void:
 	else:
 		_lock_piece_and_spawn_next()
 
-## 📌 Rotaciona a peça pro próximo estado SRS, se possível (valida e desfaz se necessário)
+## 📌 Rotaciona a peça pro próximo estado SRS, se possível
 func rotate_piece() -> void:
 	var original_state: int = current_piece.rotation_state
 	current_piece.advance_rotation()
 
 	if not board_model.can_place(current_piece.get_occupied_cells()):
-		PrintLogManager.printlog(CLASS_NAME_LOG,
-			PrintLogManager.LogType.DEBUG,
-			"Rotação rejeitada (colisão) — revertendo")
 		current_piece.revert_rotation(original_state)
 		_redraw_active_piece()
 		return
@@ -150,10 +139,6 @@ func move_left() -> void:
 		current_piece.grid_position.y -= 1
 		SignalBus.GameViewControllerSignal_piece_moved.emit(Vector2i(0, -1))
 		_redraw_active_piece()
-	else:
-		PrintLogManager.printlog(CLASS_NAME_LOG,
-			PrintLogManager.LogType.DEBUG,
-			"move_left bloqueado: colisão")
 
 ## 📌 Move a peça 1 coluna pra direita, se possível
 func move_right() -> void:
@@ -162,38 +147,24 @@ func move_right() -> void:
 		current_piece.grid_position.y += 1
 		SignalBus.GameViewControllerSignal_piece_moved.emit(Vector2i(0, 1))
 		_redraw_active_piece()
-	else:
-		PrintLogManager.printlog(CLASS_NAME_LOG,
-			PrintLogManager.LogType.DEBUG,
-			"move_right bloqueado: colisão")
 
 ## 📌 Ativa o soft drop: acelera a gravidade enquanto a tecla estiver pressionada
 func _start_soft_drop() -> void:
 	if is_soft_dropping:
 		return
-
 	is_soft_dropping = true
 	gravity_timer.wait_time = SOFT_DROP_INTERVAL
 	gravity_timer.start()
-
-	PrintLogManager.printlog(CLASS_NAME_LOG,
-		PrintLogManager.LogType.DEBUG,
-		"Soft drop ativado: intervalo=%.2fs" % SOFT_DROP_INTERVAL)
 
 ## 📌 Desativa o soft drop: volta a gravidade pro intervalo normal
 func _stop_soft_drop() -> void:
 	if not is_soft_dropping:
 		return
-
 	is_soft_dropping = false
 	gravity_timer.wait_time = GRAVITY_INTERVAL
 	gravity_timer.start()
 
-	PrintLogManager.printlog(CLASS_NAME_LOG,
-		PrintLogManager.LogType.DEBUG,
-		"Soft drop desativado: intervalo=%.2fs" % GRAVITY_INTERVAL)
-
-## 📌 Captura input de teclado: rotação (cima/W), movimento (esquerda/direita) e soft drop (baixo/S)
+## 📌 Captura input de teclado: rotação, movimento e soft drop
 func _input(event: InputEvent) -> void:
 	if not event is InputEventKey:
 		return
@@ -221,19 +192,15 @@ func _cells_moved(offset: Vector2i) -> Array[Vector2i]:
 		moved.append(cell + offset)
 	return moved
 
-## 📌 Fixa a peça atual no grid (lógico + visual permanente) e spawna a próxima
+## 📌 Fixa a peça atual no grid (lógico), processa line clears e spawna a próxima
 func _lock_piece_and_spawn_next() -> void:
 	PrintLogManager.printlog(CLASS_NAME_LOG,
 		PrintLogManager.LogType.INFO,
 		"Peça travada: tipo=%s posição=%s" % [PieceModel.PieceType.keys()[current_piece.type], str(current_piece.grid_position)])
 
 	var locked_cells: Array[Vector2i] = current_piece.get_occupied_cells()
-
 	for cell in locked_cells:
 		board_model.grid[cell.x][cell.y] = current_piece.type + 1
-		var block: TextureRect = _create_block_visual(cell, current_piece.type)
-		block_container.add_child(block)
-		locked_block_visuals[cell] = block
 
 	SignalBus.GameViewControllerSignal_piece_locked.emit(current_piece.type, locked_cells)
 
@@ -241,9 +208,34 @@ func _lock_piece_and_spawn_next() -> void:
 		block.queue_free()
 	active_block_visuals.clear()
 
+	_process_line_clears()
 	_spawn_new_piece()
 
-## 📌 Recria SÓ os blocos visuais da peça ativa (a cada queda/rotação/movimento)
+## 📌 Verifica linhas completas, remove/aplica gravidade no Model e redesenha a pilha visual
+func _process_line_clears() -> void:
+	var completed_rows: Array[int] = board_model.get_completed_rows()
+
+	if completed_rows.size() > 0:
+		board_model.clear_rows(completed_rows)
+
+	_redraw_locked_board()
+
+## 📌 Apaga todos os blocos fixados e recria do zero a partir do board_model.grid atual
+func _redraw_locked_board() -> void:
+	for block in locked_block_visuals:
+		block.queue_free()
+	locked_block_visuals.clear()
+
+	for row in range(BoardModel.GRID_ROWS):
+		for col in range(BoardModel.GRID_COLUMNS):
+			var value: int = board_model.grid[row][col]
+			if value != 0:
+				var piece_type: int = value - 1
+				var block: TextureRect = _create_block_visual(Vector2i(row, col), piece_type)
+				block_container.add_child(block)
+				locked_block_visuals.append(block)
+
+## 📌 Recria SÓ os blocos visuais da peça ativa
 func _redraw_active_piece() -> void:
 	for block in active_block_visuals:
 		block.queue_free()
@@ -254,7 +246,7 @@ func _redraw_active_piece() -> void:
 		block_container.add_child(block)
 		active_block_visuals.append(block)
 
-## 📌 Cria um TextureRect de bloco escalado corretamente pro cell_size (única fonte de criação)
+## 📌 Cria um TextureRect de bloco escalado corretamente pro cell_size
 func _create_block_visual(cell: Vector2i, piece_type: int) -> TextureRect:
 	var block: TextureRect = TextureRect.new()
 	block.texture = BLOCK_TEXTURE
@@ -266,12 +258,11 @@ func _create_block_visual(cell: Vector2i, piece_type: int) -> TextureRect:
 	block.position = Vector2(cell.y * cell_size, cell.x * cell_size)
 	return block
 
-## 📌 Trata o game over: para o timer, emite sinal e loga o evento (ainda sem tela de game over)
+## 📌 Trata o game over: para o timer e loga o evento
 func _handle_game_over() -> void:
 	PrintLogManager.printlog(CLASS_NAME_LOG,
 		PrintLogManager.LogType.ERROR,
-		"GAME OVER — parando timer. Total de linhas: %d | Level: %d" %
+		"GAME OVER — Total de linhas: %d | Level: %d" %
 		[board_model.total_lines_cleared, board_model.current_level])
 
-	SignalBus.GameViewControllerSignal_game_over.emit(board_model.total_lines_cleared, board_model.current_level)
 	gravity_timer.stop()
