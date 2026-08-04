@@ -1,5 +1,5 @@
 ## 📌 game_view_controller.gd
-## Controller da tela de jogo — spawn, gravidade, rotação manual e soft drop (Ep3)
+## Controller da tela de jogo
 ## cell_size é derivado da textura em runtime (16/24/32/64px, o asset comanda)
 class_name GameViewController
 extends Control
